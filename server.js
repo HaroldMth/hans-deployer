@@ -299,7 +299,7 @@ async function runDeploy(slug, sid, config, ramCap) {
     fs.writeFileSync(path.join(botDir, ".npmrc"),
       "dangerouslyAllowAllBuilds=true\nignore-scripts=false\n");
     await runCmd(
-      "pnpm", ["install", "--prod", "--no-frozen-lockfile", "--dangerously-allow-all-builds"],
+      "pnpm", ["install", "--prod", "--no-frozen-lockfile", "--dangerously-allow-all-builds", "--reporter=append-only"],
       slug, {
         cwd: botDir,
         env: {
@@ -415,8 +415,9 @@ const server = http.createServer(async (req, res) => {
     if (method === "GET" && sub === "/logs") {
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
       });
       const rt = getRuntime(slug);
       // replay buffer
