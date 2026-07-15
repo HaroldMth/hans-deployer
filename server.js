@@ -221,7 +221,7 @@ async function runDeploy(slug, sid, config, ramCap) {
   rt.logs = [];
   pushStatus(slug, "deploying");
 
-  const tmpZip     = path.join("/tmp", `hans_${slug}.zip`);
+  const tmpTar     = path.join("/tmp", `hans_${slug}.tar.gz`);
   const tmpExtract = path.join("/tmp", `hans_extract_${slug}`);
   const botDir     = path.join(BOTS_DIR, slug);
 
@@ -237,23 +237,23 @@ async function runDeploy(slug, sid, config, ramCap) {
     pushLog(slug, "📡 Fetching latest release info from GitHub...");
     const { body } = await httpsGet(GH_API);
     const release = JSON.parse(body);
-    const zipUrl = release.zipball_url;
+    const tarUrl = release.tarball_url;
     const tag = release.tag_name || "latest";
     pushLog(slug, `📦 Release: ${tag}`);
 
-    // 3. Download ZIP
+    // 3. Download Tarball
     pushLog(slug, "⬇️  Downloading release archive...");
-    await downloadFile(zipUrl, tmpZip);
-    const sizeMB = (fs.statSync(tmpZip).size / 1024 / 1024).toFixed(1);
+    await downloadFile(tarUrl, tmpTar);
+    const sizeMB = (fs.statSync(tmpTar).size / 1024 / 1024).toFixed(1);
     pushLog(slug, `✅ Downloaded ${sizeMB} MB`);
 
     // 4. Extract
     pushLog(slug, "📂 Extracting archive...");
     fs.rmSync(tmpExtract, { recursive: true, force: true });
     fs.mkdirSync(tmpExtract, { recursive: true });
-    await runCmd("unzip", ["-o", tmpZip, "-d", tmpExtract], slug);
+    await runCmd("tar", ["-xzf", tmpTar, "-C", tmpExtract], slug);
 
-    // GitHub zipball contains one top-level folder
+    // GitHub release tarball contains one top-level folder
     const [innerDir] = fs.readdirSync(tmpExtract);
     const srcDir = path.join(tmpExtract, innerDir);
     fs.rmSync(botDir, { recursive: true, force: true });
@@ -269,7 +269,7 @@ async function runDeploy(slug, sid, config, ramCap) {
     pushLog(slug, "✅ Extracted");
 
     // 5. Cleanup temp files
-    try { fs.rmSync(tmpZip, { force: true }); } catch {}
+    try { fs.rmSync(tmpTar, { force: true }); } catch {}
     try { fs.rmSync(tmpExtract, { recursive: true, force: true }); } catch {}
 
     // 6. Write .env
