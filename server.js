@@ -284,13 +284,21 @@ async function runDeploy(slug, sid, config, ramCap) {
     }
 
     // 8. Ensure pnpm is available
+    let pnpmCmd = "pnpm";
+    let pnpmArgs = [];
+
     pushLog(slug, "🔍 Checking for pnpm...");
     try {
       await runCmd("pnpm", ["--version"], slug, {});
     } catch {
-      pushLog(slug, "📥 pnpm not found — installing globally...");
-      await runCmd("npm", ["install", "-g", "pnpm"], slug, {});
-      pushLog(slug, "✅ pnpm installed");
+      const localPnpm = path.join(HERE, "node_modules", "pnpm", "bin", "pnpm.cjs");
+      if (!fs.existsSync(localPnpm)) {
+        pushLog(slug, "📥 pnpm not found — installing locally (no root required)...");
+        await runCmd("npm", ["install", "pnpm"], slug, { cwd: HERE });
+        pushLog(slug, "✅ pnpm installed locally");
+      }
+      pnpmCmd = "node";
+      pnpmArgs = [localPnpm];
     }
 
     // 9. Install dependencies via pnpm
@@ -299,7 +307,7 @@ async function runDeploy(slug, sid, config, ramCap) {
     fs.writeFileSync(path.join(botDir, ".npmrc"),
       "dangerouslyAllowAllBuilds=true\nignore-scripts=false\n");
     await runCmd(
-      "pnpm", ["install", "--prod", "--no-frozen-lockfile", "--dangerously-allow-all-builds", "--reporter=append-only"],
+      pnpmCmd, [...pnpmArgs, "install", "--prod", "--no-frozen-lockfile", "--dangerously-allow-all-builds", "--reporter=append-only"],
       slug, {
         cwd: botDir,
         env: {
@@ -322,7 +330,7 @@ async function runDeploy(slug, sid, config, ramCap) {
   } catch (err) {
     pushLog(slug, `\n❌ Deploy failed: ${err.message}`);
     pushStatus(slug, "error");
-    try { fs.rmSync(tmpZip, { force: true }); } catch {}
+    try { fs.rmSync(tmpTar, { force: true }); } catch {}
     try { fs.rmSync(tmpExtract, { recursive: true, force: true }); } catch {}
   } finally {
     rt.pipeLock = false;
