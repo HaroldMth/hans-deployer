@@ -1,0 +1,6 @@
+# HANS MD Deploy Platform Ignore Files
+bots/
+state.json
+.DS_Store
+*.log
+.env

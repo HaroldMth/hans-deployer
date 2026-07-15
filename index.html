@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HANS MD — Deploy</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #080b12;
+    --bg2:       #0d1117;
+    --bg3:       #161b27;
+    --border:    rgba(255,255,255,0.07);
+    --green:     #00ff88;
+    --cyan:      #00d4ff;
+    --purple:    #a855f7;
+    --red:       #ff4d6d;
+    --amber:     #fbbf24;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --glass:     rgba(255,255,255,0.04);
+    --radius:    14px;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Inter', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise overlay ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── Grid bg ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black, transparent);
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* ── Header ── */
+  .header { text-align: center; padding: 60px 0 48px; }
+  .logo-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--glass); border: 1px solid var(--border);
+    border-radius: 99px; padding: 6px 16px 6px 10px;
+    font-size: 12px; color: var(--green); letter-spacing: .06em;
+    font-family: var(--mono); margin-bottom: 24px;
+    backdrop-filter: blur(8px);
+  }
+  .logo-badge span { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: block; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  h1 {
+    font-size: clamp(36px, 6vw, 56px); font-weight: 700;
+    letter-spacing: -.03em; line-height: 1.1;
+    background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--purple) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .subtitle { color: var(--muted); margin-top: 12px; font-size: 16px; font-weight: 400; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--glass); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 28px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.02) inset, 0 24px 48px rgba(0,0,0,.4);
+  }
+  .card + .card { margin-top: 16px; }
+  .card-title {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 20px;
+  }
+
+  /* ── Input ── */
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .field input, .field select {
+    width: 100%; background: rgba(0,0,0,.4); border: 1px solid var(--border);
+    border-radius: 8px; padding: 11px 14px; color: var(--text);
+    font-family: var(--mono); font-size: 13px;
+    outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,212,255,.1);
+  }
+  .field input::placeholder { color: var(--muted); }
+
+  /* ── RAM slider ── */
+  .ram-row { display: flex; align-items: center; gap: 12px; }
+  .ram-row input[type=range] {
+    flex: 1; -webkit-appearance: none; height: 4px;
+    background: var(--border); border-radius: 99px; border: none; padding: 0;
+    cursor: pointer;
+  }
+  .ram-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--cyan); cursor: pointer; border: 2px solid var(--bg);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  .ram-val { font-family: var(--mono); font-size: 13px; color: var(--cyan); min-width: 56px; text-align: right; }
+
+  /* ── Toggles ── */
+  .toggles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media(max-width:500px) { .toggles-grid { grid-template-columns: 1fr; } }
+
+  .toggle-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(0,0,0,.2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+    cursor: pointer; transition: border-color .2s;
+  }
+  .toggle-item:hover { border-color: rgba(255,255,255,.15); }
+  .toggle-label { font-size: 12px; color: var(--text); font-weight: 500; }
+  .toggle-desc { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider-sw {
+    position: absolute; inset: 0; background: var(--bg3);
+    border: 1px solid var(--border); border-radius: 99px;
+    cursor: pointer; transition: background .2s;
+  }
+  .slider-sw::before {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    top: 3px; left: 3px; border-radius: 50%; background: var(--muted);
+    transition: transform .2s, background .2s;
+  }
+  input:checked + .slider-sw { background: rgba(0,255,136,.15); border-color: var(--green); }
+  input:checked + .slider-sw::before { transform: translateX(16px); background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  /* ── Button ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 24px; border-radius: 10px; border: none;
+    font-family: var(--sans); font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all .2s; outline: none; text-decoration: none;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    color: #fff; box-shadow: 0 4px 24px rgba(0,212,255,.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(0,212,255,.4); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  .btn-ghost {
+    background: var(--glass); border: 1px solid var(--border); color: var(--text);
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.08); }
+  .btn-danger { background: rgba(255,77,109,.15); border: 1px solid rgba(255,77,109,.3); color: var(--red); }
+  .btn-danger:hover { background: rgba(255,77,109,.25); }
+  .btn-amber { background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.3); color: var(--amber); }
+
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+  .btn-full { width: 100%; }
+
+  /* ── Terminal ── */
+  .terminal {
+    background: #000; border: 1px solid rgba(0,255,136,.2);
+    border-radius: var(--radius); padding: 20px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.7;
+    color: var(--green); height: 360px; overflow-y: auto;
+    word-break: break-all;
+    box-shadow: 0 0 40px rgba(0,255,136,.05) inset, 0 0 0 1px rgba(0,255,136,.05) inset;
+  }
+  .terminal::-webkit-scrollbar { width: 4px; }
+  .terminal::-webkit-scrollbar-track { background: transparent; }
+  .terminal::-webkit-scrollbar-thumb { background: rgba(0,255,136,.2); border-radius: 99px; }
+
+  .term-line { white-space: pre-wrap; }
+  .term-line.err { color: var(--red); }
+  .term-line.info { color: var(--cyan); }
+  .term-line.warn { color: var(--amber); }
+  .term-cursor { display: inline-block; width: 8px; height: 14px; background: var(--green); animation: blink .9s step-end infinite; vertical-align: text-bottom; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  /* ── Terminal bar ── */
+  .term-bar {
+    background: rgba(0,0,0,.6); border: 1px solid rgba(0,255,136,.2);
+    border-bottom: none; border-radius: var(--radius) var(--radius) 0 0;
+    padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .term-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .term-bar .dot.r { background: #ff5f57; }
+  .term-bar .dot.y { background: #febc2e; }
+  .term-bar .dot.g { background: #28c840; }
+  .term-bar .term-title { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: 8px; }
+  .terminal { border-radius: 0 0 var(--radius) var(--radius); }
+
+  /* ── RAM bar ── */
+  .ram-bar-wrap { margin-top: 16px; }
+  .ram-bar-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .ram-bar-track { background: var(--bg3); border-radius: 99px; height: 6px; overflow: hidden; }
+  .ram-bar-fill {
+    height: 100%; border-radius: 99px;
+    background: linear-gradient(90deg, var(--green), var(--cyan));
+    transition: width .6s ease, background .6s;
+    box-shadow: 0 0 8px rgba(0,255,136,.4);
+  }
+  .ram-bar-fill.warn { background: linear-gradient(90deg, var(--amber), var(--red)); box-shadow: 0 0 8px rgba(255,77,109,.4); }
+
+  /* ── Status badge ── */
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600;
+    font-family: var(--mono);
+  }
+  .status-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .sb-stopped { background: rgba(100,116,139,.15); color: var(--muted); }
+  .sb-stopped .dot { background: var(--muted); }
+  .sb-running  { background: rgba(0,212,255,.1); color: var(--cyan); }
+  .sb-running .dot  { background: var(--cyan); animation: pulse 1.5s infinite; }
+  .sb-online   { background: rgba(0,255,136,.1); color: var(--green); }
+  .sb-online .dot   { background: var(--green); animation: pulse 1.5s infinite; }
+  .sb-deploying { background: rgba(168,85,247,.1); color: var(--purple); }
+  .sb-deploying .dot { background: var(--purple); animation: pulse .8s infinite; }
+  .sb-error    { background: rgba(255,77,109,.1); color: var(--red); }
+  .sb-error .dot { background: var(--red); }
+
+  /* ── Success banner ── */
+  .success-banner {
+    background: rgba(0,255,136,.07); border: 1px solid rgba(0,255,136,.25);
+    border-radius: var(--radius); padding: 28px; text-align: center;
+    animation: fadeIn .5s ease;
+  }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  .success-icon { font-size: 48px; margin-bottom: 12px; }
+  .success-title { font-size: 22px; font-weight: 700; color: var(--green); }
+  .success-sub { color: var(--muted); font-size: 14px; margin-top: 6px; }
+
+  /* ── Screen manager ── */
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── Bot list ── */
+  .bot-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: rgba(0,0,0,.2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; cursor: pointer;
+    transition: border-color .2s;
+  }
+  .bot-item:hover { border-color: var(--cyan); }
+  .bot-item + .bot-item { margin-top: 8px; }
+  .bot-sid { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .bot-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  hr.divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid var(--border);
+    border-top-color: var(--cyan); border-radius: 50%;
+    animation: spin .7s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .version-tag {
+    font-family: var(--mono); font-size: 11px; color: var(--purple);
+    background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.2);
+    border-radius: 4px; padding: 2px 8px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <div class="logo-badge"><span></span>HANS MD · Deploy Platform</div>
+    <h1>Deploy Your Bot</h1>
+    <p class="subtitle">Enter your Session ID to deploy or manage your HANS MD instance</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 1 — Entry (SID input + bot list)
+  ══════════════════════════════════════════ -->
+  <div id="screen-entry" class="screen active">
+
+    <div class="card">
+      <div class="card-title">Session ID</div>
+      <div class="field">
+        <input id="sid-input" type="text" placeholder="HANS-BYTE~xxxxxxxxxxxxxxxx" autocomplete="off" spellcheck="false"/>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin:-4px 0 14px;line-height:1.6">
+        Don't have a Session ID? Get one at
+        <a href="http://34.39.174.93:3000" target="_blank" style="color:var(--cyan);text-decoration:none">34.39.174.93:3000</a>
+        — enter your number and scan or paste the pairing code in WhatsApp.
+      </div>
+      <button class="btn btn-primary btn-full" id="btn-lookup" onclick="handleLookup()">
+        <div class="spinner" id="lookup-spinner"></div>
+        Continue →
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 2 — Deploy Wizard
+  ══════════════════════════════════════════ -->
+  <div id="screen-deploy" class="screen">
+
+    <div class="card">
+      <div class="section-head">
+        <div class="card-title" style="margin:0">New Deployment</div>
+        <span id="wizard-sid-badge" class="version-tag"></span>
+      </div>
+
+      <!-- RAM cap -->
+      <div class="field">
+        <label>RAM Cap per bot</label>
+        <div class="ram-row">
+          <input type="range" id="ram-cap-slider" min="128" max="1024" step="64" value="512" oninput="document.getElementById('ram-cap-val').textContent=this.value+'MB'"/>
+          <span class="ram-val" id="ram-cap-val">512MB</span>
+        </div>
+      </div>
+
+      <hr class="divider"/>
+
+      <!-- All env vars — loaded from /config -->
+      <div id="toggles-grid">
+        <div style="color:var(--muted);font-size:12px">Loading config…</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="showScreen('entry')">← Back</button>
+        <button class="btn btn-primary" style="flex:1" id="btn-deploy" onclick="handleDeploy()">
+          <div class="spinner" id="deploy-spinner"></div>
+          🚀 Deploy Now
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 3 — Live Logs
+  ══════════════════════════════════════════ -->
+  <div id="screen-logs" class="screen">
+
+    <div class="card" style="padding:20px">
+      <div class="section-head">
+        <div>
+          <div class="card-title" style="margin:0 0 6px">Deploying</div>
+          <span id="logs-status-badge" class="status-badge sb-deploying"><span class="dot"></span> Deploying…</span>
+        </div>
+        <span id="logs-version-tag" class="version-tag"></span>
+      </div>
+
+      <div class="ram-bar-wrap" id="logs-ram-wrap" style="display:none">
+        <div class="ram-bar-label">
+          <span>RAM Usage</span>
+          <span id="logs-ram-label">0MB / 512MB</span>
+        </div>
+        <div class="ram-bar-track"><div class="ram-bar-fill" id="logs-ram-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="term-bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <span class="term-title" id="term-title">hans-deploy › node index.js</span>
+    </div>
+    <div class="terminal" id="terminal"><span class="term-cursor"></span></div>
+
+    <div class="btn-row" id="logs-btn-row" style="display:none">
+      <button class="btn btn-ghost" onclick="showDashboard(currentSlug)">⚙ Dashboard</button>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 4 — Dashboard
+  ══════════════════════════════════════════ -->
+  <div id="screen-dashboard" class="screen">
+
+    <div class="card">
+      <div class="section-head">
+        <div>
+          <div class="card-title" style="margin:0 0 8px">Bot Status</div>
+          <span id="dash-status-badge" class="status-badge sb-stopped"><span class="dot"></span> Stopped</span>
+        </div>
+        <div>
+          <div class="version-tag" id="dash-version">—</div>
+        </div>
+      </div>
+
+      <div class="ram-bar-wrap">
+        <div class="ram-bar-label">
+          <span>RAM</span>
+          <span id="dash-ram-label">0 MB</span>
+        </div>
+        <div class="ram-bar-track"><div class="ram-bar-fill" id="dash-ram-fill" style="width:0%"></div></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="showLogsScreen(currentSlug)">📋 Logs</button>
+        <button class="btn btn-ghost btn-amber" onclick="restartBot()">♻ Restart</button>
+        <button class="btn btn-ghost btn-amber" onclick="redeployBot()">⬆ Redeploy</button>
+        <button class="btn btn-danger" onclick="stopBot()">⛔ Stop</button>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="card" id="dash-settings-card">
+      <div class="card-title">Settings</div>
+
+      <div class="field">
+        <label>RAM Cap</label>
+        <div class="ram-row">
+          <input type="range" id="dash-ram-slider" min="128" max="1024" step="64" value="512" oninput="document.getElementById('dash-ram-val').textContent=this.value+'MB'"/>
+          <span class="ram-val" id="dash-ram-val">512MB</span>
+        </div>
+      </div>
+
+      <hr class="divider"/>
+      <div class="card-title">Configuration</div>
+      <div id="dash-toggles-grid"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="showScreen('entry')">← Home</button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveSettings()">Save & Restart</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let currentSlug = null;
+let currentSid  = null;
+let currentSse  = null;
+let configDefs  = {};   // from /config
+let currentRamCap = 512;
+
+// ── Screen helpers ─────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+// ── API helpers ────────────────────────────────────────────────────────
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+// ── Entry screen ───────────────────────────────────────────────────────
+async function handleLookup() {
+  const sid = document.getElementById('sid-input').value.trim();
+  if (!sid) return;
+  const btn = document.getElementById('btn-lookup');
+  const sp  = document.getElementById('lookup-spinner');
+  btn.disabled = true; sp.style.display = 'block';
+
+  try {
+    const data = await api('GET', `/lookup?sid=${encodeURIComponent(sid)}`);
+    currentSid  = sid;
+    currentSlug = data.slug;
+    currentRamCap = data.ramCap || 512;
+
+    if (data.exists) {
+      showDashboard(data.slug, data);
+    } else {
+      await loadConfig();
+      showDeployWizard(sid);
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; sp.style.display = 'none';
+  }
+}
+
+// Allow Enter key
+document.getElementById('sid-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLookup();
+});
+
+// ── Config & toggles ───────────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const data = await api('GET', '/config');
+    configDefs = data.env || {};
+  } catch { configDefs = {}; }
+}
+
+// Keys handled separately (auth / server internals)
+const AUTH_KEYS = new Set(['SESSION_ID','SID','OWNER_NUMBER','PAIRING_SERVER_URL']);
+
+function isBool(def) {
+  const v = (def.value || '').toLowerCase();
+  return v === 'true' || v === 'false';
+}
+
+function buildConfig(containerId, currentConfig = {}) {
+  const container = document.getElementById(containerId);
+  const entries = Object.entries(configDefs).filter(([k]) => !AUTH_KEYS.has(k));
+
+  if (!entries.length) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:12px">No options available</div>';
+    return;
+  }
+
+  const bools = entries.filter(([, d]) => isBool(d));
+  const texts = entries.filter(([, d]) => !isBool(d));
+
+  let html = '';
+
+  // Text inputs
+  if (texts.length) {
+    html += '<div class="card-title" style="margin-bottom:14px">Settings</div>';
+    html += texts.map(([k, def]) => {
+      const val = currentConfig[k] !== undefined ? currentConfig[k] : (def.value || '');
+      const label = k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+      const desc = (def.description || '').slice(0, 80);
+      const sensitive = /key|token|secret|pass/i.test(k);
+      return `<div class="field">
+        <label title="${desc}">${label}</label>
+        <input type="${sensitive ? 'password' : 'text'}" data-key="${k}" data-type="text"
+          value="${val.replace(/"/g,'&quot;')}" placeholder="${desc.slice(0,50)}"/>
+      </div>`;
+    }).join('');
+  }
+
+  // Bool toggles
+  if (bools.length) {
+    html += `<hr class="divider"/><div class="card-title" style="margin-bottom:14px">Feature Toggles</div>`;
+    html += '<div class="toggles-grid">';
+    html += bools.map(([k, def]) => {
+      const current = currentConfig[k];
+      const checked = current !== undefined ? current === 'true' : def.value === 'true';
+      const label = k.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase());
+      const desc = (def.description || '').split('(')[0].trim().slice(0, 48);
+      return `<label class="toggle-item">
+        <div>
+          <div class="toggle-label">${label}</div>
+          <div class="toggle-desc">${desc}</div>
+        </div>
+        <div class="switch">
+          <input type="checkbox" data-key="${k}" data-type="bool" ${checked ? 'checked' : ''}/>
+          <span class="slider-sw"></span>
+        </div>
+      </label>`;
+    }).join('');
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function collectConfig(containerId) {
+  const result = {};
+  document.querySelectorAll(`#${containerId} [data-key]`).forEach(el => {
+    const k = el.dataset.key;
+    if (el.dataset.type === 'bool') result[k] = el.checked ? 'true' : 'false';
+    else result[k] = el.value;
+  });
+  return result;
+}
+
+// ── Deploy Wizard ──────────────────────────────────────────────────────
+function showDeployWizard(sid) {
+  document.getElementById('wizard-sid-badge').textContent = sid.slice(0, 22) + '…';
+  buildConfig('toggles-grid', {});
+  showScreen('deploy');
+}
+
+async function handleDeploy() {
+  const ramCap = Number(document.getElementById('ram-cap-slider').value);
+  const config = collectConfig('toggles-grid');
+  const btn = document.getElementById('btn-deploy');
+  const sp  = document.getElementById('deploy-spinner');
+  btn.disabled = true; sp.style.display = 'block';
+
+  try {
+    const data = await api('POST', '/deploy', { sid: currentSid, config, ramCap });
+    if (!data.ok) throw new Error(data.error || 'Deploy failed');
+    currentSlug  = data.slug;
+    currentRamCap = ramCap;
+    showLogsScreen(currentSlug, true);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; sp.style.display = 'none';
+  }
+}
+
+// ── Logs Screen ────────────────────────────────────────────────────────
+function showLogsScreen(slug, isNewDeploy = false) {
+  const terminal = document.getElementById('terminal');
+  terminal.innerHTML = '<span class="term-cursor"></span>';
+  document.getElementById('logs-btn-row').style.display = 'none';
+  document.getElementById('logs-ram-wrap').style.display = 'none';
+  showScreen('logs');
+
+  if (currentSse) { currentSse.close(); currentSse = null; }
+
+  const sse = new EventSource(`/bot/${slug}/logs`);
+  currentSse = sse;
+
+  sse.onmessage = e => {
+    const line = JSON.parse(e.data);
+    appendTermLine(line);
+    if (line.includes('HANS MD Connected') || line.includes('connected to WA')) {
+      setLogsStatus('online');
+      document.getElementById('logs-btn-row').style.display = 'flex';
+    }
+    if (line.startsWith('⛔')) setLogsStatus('stopped');
+    if (line.startsWith('❌')) setLogsStatus('error');
+    if (line.startsWith('🚀')) setLogsStatus('deploying');
+  };
+
+  sse.addEventListener('status', e => setLogsStatus(JSON.parse(e.data)));
+  sse.addEventListener('ram', e => {
+    const mb = Number(e.data);
+    const cap = currentRamCap || 512;
+    const pct = Math.min(100, (mb / cap) * 100);
+    document.getElementById('logs-ram-wrap').style.display = mb > 0 ? 'block' : 'none';
+    document.getElementById('logs-ram-label').textContent = `${mb}MB / ${cap}MB`;
+    const fill = document.getElementById('logs-ram-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'ram-bar-fill' + (pct > 80 ? ' warn' : '');
+  });
+
+  sse.onerror = () => { /* reconnects automatically */ };
+}
+
+function appendTermLine(line) {
+  const terminal = document.getElementById('terminal');
+  const cursor = terminal.querySelector('.term-cursor');
+  const div = document.createElement('div');
+  div.className = 'term-line' + (line.startsWith('[ERR]') ? ' err' : line.startsWith('✅') ? ' info' : line.startsWith('⚠️') ? ' warn' : '');
+  div.textContent = line;
+  terminal.insertBefore(div, cursor);
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function setLogsStatus(status) {
+  const badge = document.getElementById('logs-status-badge');
+  badge.className = `status-badge sb-${status}`;
+  badge.innerHTML = `<span class="dot"></span> ${statusText(status)}`;
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────
+async function showDashboard(slug, data = null) {
+  currentSlug = slug;
+  if (!data) data = await api('GET', `/bot/${slug}/status`);
+  currentRamCap = data.ramCap || 512;
+
+  // Status badge
+  updateDashStatus(data.status, data.ramMB, data.ramCap);
+  document.getElementById('dash-version').textContent = data.version || '—';
+
+  // RAM slider
+  document.getElementById('dash-ram-slider').value = data.ramCap || 512;
+  document.getElementById('dash-ram-val').textContent = (data.ramCap || 512) + 'MB';
+
+  // Toggles
+  if (!Object.keys(configDefs).length) await loadConfig();
+  buildConfig('dash-toggles-grid', data.config || {});
+
+  showScreen('dashboard');
+
+  // Live SSE for status + RAM
+  if (currentSse) { currentSse.close(); currentSse = null; }
+  const sse = new EventSource(`/bot/${slug}/logs`);
+  currentSse = sse;
+  sse.addEventListener('status', e => updateDashStatus(JSON.parse(e.data), null, currentRamCap));
+  sse.addEventListener('ram', e => {
+    const mb = Number(e.data);
+    const cap = currentRamCap;
+    const pct = Math.min(100, (mb / cap) * 100);
+    document.getElementById('dash-ram-label').textContent = `${mb}MB / ${cap}MB`;
+    const fill = document.getElementById('dash-ram-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'ram-bar-fill' + (pct > 80 ? ' warn' : '');
+  });
+}
+
+function updateDashStatus(status, ramMB, ramCap) {
+  const badge = document.getElementById('dash-status-badge');
+  badge.className = `status-badge sb-${status}`;
+  badge.innerHTML = `<span class="dot"></span> ${statusText(status)}`;
+  if (ramMB !== null && ramMB !== undefined) {
+    const pct = Math.min(100, (ramMB / (ramCap || 512)) * 100);
+    document.getElementById('dash-ram-label').textContent = `${ramMB}MB / ${ramCap || 512}MB`;
+    document.getElementById('dash-ram-fill').style.width = pct + '%';
+  }
+}
+
+async function stopBot() {
+  if (!confirm('Stop the bot?')) return;
+  await api('POST', `/bot/${currentSlug}/stop`);
+}
+
+async function restartBot() {
+  await api('POST', `/bot/${currentSlug}/restart`);
+}
+
+async function redeployBot() {
+  if (!confirm('Pull latest release and redeploy?')) return;
+  showLogsScreen(currentSlug);
+  await api('POST', `/bot/${currentSlug}/redeploy`);
+}
+
+async function saveSettings() {
+  const config = collectConfig('dash-toggles-grid');
+  const ramCap = Number(document.getElementById('dash-ram-slider').value);
+  currentRamCap = ramCap;
+  await api('POST', `/bot/${currentSlug}/settings`, { config, ramCap });
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────
+function statusText(s) {
+  return { stopped:'Stopped', running:'Running', online:'Online ✓', deploying:'Deploying…', error:'Error' }[s] || s;
+}
+function statusBadge(s) {
+  return `<span class="status-badge sb-${s}"><span class="dot"></span>${statusText(s)}</span>`;
+}
+</script>
+</body>
+</html>
