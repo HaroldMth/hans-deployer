@@ -180,8 +180,9 @@ function spawnBot(slug) {
   rt.proc.stderr.on("data", (d) =>
     d.toString().split("\n").filter(Boolean).forEach((l) => pushLog(slug, `[ERR] ${l}`))
   );
-  rt.proc.on("close", (code) => {
-    pushLog(slug, `\n⛔ Process exited (code ${code})`);
+  rt.proc.on("close", (code, signal) => {
+    const endMsg = signal ? `signal ${signal}` : `code ${code}`;
+    pushLog(slug, `\n⛔ Process exited (${endMsg})`);
     pushStatus(slug, "stopped");
     pushRam(slug, 0);
     rt.proc = null;
